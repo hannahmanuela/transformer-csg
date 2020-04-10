@@ -14,7 +14,7 @@ NUM_HEADS = 1
 DROPOUT_RATE = 0.1
 STR_LENGTH = 9
 
-disc_train_loss = tf.keras.metrics.Mean(name='train_loss')
+disc_train_loss = tf.keras.metrics.Mean(name='disc_train_loss')
 disc_accuracy = tf.keras.metrics.Accuracy(
     name='accuracy')
 
@@ -35,7 +35,7 @@ embedding_dim = 256
 BATCH_SIZE = 5
 
 NUM_GENERATE = 3
-gen_train_loss = tf.keras.metrics.Mean(name='train_loss')
+gen_train_loss = tf.keras.metrics.Mean(name='gen_train_loss')
 gen_accuracy = tf.keras.metrics.Accuracy(
     name='accuracy')
 
@@ -85,15 +85,21 @@ def generate_seeds():
 # @tf.function
 def train_step(seed):
 
-    generator_data = generator.model(seed)
-    true_labels = get_true_labels(generator_data)
-
-    enc_padding_mask, combined_mask, dec_padding_mask = TransformerDiscriminator.create_masks(generator_data, generator_data, 0)
-
     with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
+
+        gen_tape.watch(generator.model.trainable_variables)
+
+        generator_data = generator.model(seed)
+        true_labels = get_true_labels(generator_data)
+
+        enc_padding_mask, combined_mask, dec_padding_mask = TransformerDiscriminator.create_masks(generator_data,
+                                                                                                  generator_data, 0)
 
         logits, all_weights = discriminator.call(tf.round(generator_data), tf.round(generator_data),
                                                  True, enc_padding_mask, combined_mask, dec_padding_mask)
+
+        disc_tape.watch(discriminator.trainable_variables)
+        print('`logits` has type {0}'.format(type(logits)))
 
         disc_loss = tf.keras.losses.binary_crossentropy(true_labels, logits, from_logits=False)
         gen_loss = generator.loss_object(1 - true_labels, logits)
@@ -116,7 +122,8 @@ def train_step(seed):
 def train(epochs):
     for epoch in range(epochs):
         seed = generate_seeds()
-        train_step(seed)
+        for (batch, seed) in enumerate(seed):
+            train_step(seed)
         print('Epoch {} finished'.format(epoch))
 
 
