@@ -410,7 +410,8 @@ class Transformer(tf.keras.Model):
                                input_vocab_size, pe_input, rate)
 
         self.dense_layer = tf.keras.layers.Dense(1)
-        self.seq_class_layer = tf.keras.layers.Dense(1)
+        # TODO was no activation parameter
+        self.seq_class_layer = tf.keras.layers.Dense(1, activation="sigmoid")
 
     def call(self, inp, tar, training, enc_padding_mask,
              look_ahead_mask, dec_padding_mask):

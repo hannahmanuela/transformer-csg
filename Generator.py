@@ -28,7 +28,6 @@ class Generator:
         model.add(tf.keras.layers.Dense(self.seq_length, activation='sigmoid'))
 
         self.optimizer = tf.keras.optimizers.RMSprop(learning_rate=0.01)
-        # model.compile(loss='binary_crossentropy', optimizer=self.optimizer)
         self.model = model
 
         self.loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=False)

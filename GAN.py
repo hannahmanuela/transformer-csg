@@ -3,7 +3,7 @@ import Generator
 import tensorflow as tf
 import numpy as np
 
-train_steps = 100
+train_steps = 20
 
 # params for discriminator
 NUM_LAYERS = 1
@@ -87,46 +87,39 @@ def train_step(seed):
 
     with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
 
-        gen_tape.watch(generator.model.trainable_variables)
+        generator_data = generator.model(seed[0], training=True)
+        for curr_seed in seed[1:]:
+            generator_data_to_add = generator.model(curr_seed, training=True)
+            generator_data = tf.concat([generator_data, generator_data_to_add], 0)
 
-        generator_data = generator.model(seed)
         true_labels = get_true_labels(generator_data)
 
         enc_padding_mask, combined_mask, dec_padding_mask = TransformerDiscriminator.create_masks(generator_data,
                                                                                                   generator_data, 0)
 
-        logits, all_weights = discriminator.call(tf.round(generator_data), tf.round(generator_data),
+        logits, all_weights = discriminator.call(generator_data, generator_data,
                                                  True, enc_padding_mask, combined_mask, dec_padding_mask)
 
-        disc_tape.watch(discriminator.trainable_variables)
-        print('`logits` has type {0}'.format(type(logits)))
-
         disc_loss = tf.keras.losses.binary_crossentropy(true_labels, logits, from_logits=False)
-        gen_loss = generator.loss_object(1 - true_labels, logits)
 
-        disc_gradients = disc_tape.gradient(disc_loss, discriminator.trainable_variables)
-        gen_gradients = gen_tape.gradient(gen_loss, generator.model.trainable_variables)
+        gen_goal = tf.cast(tf.math.logical_not(tf.math.logical_xor(tf.cast(true_labels, tf.bool), tf.cast(tf.round(logits), tf.bool))), tf.int32)
+        gen_loss = tf.math.reduce_sum(gen_goal)
 
-        TransformerDiscriminator.optimizer.apply_gradients(zip(disc_gradients, discriminator.trainable_variables))
-        generator.optimizer.apply_gradients(zip(gen_gradients, generator.model.trainable_variables))
+    disc_gradients = disc_tape.gradient(disc_loss, discriminator.trainable_variables)
+    gen_gradients = gen_tape.gradient(gen_loss, generator.model.trainable_variables)
 
-        disc_train_loss.update_state(disc_loss)
-        gen_train_loss.update_state(gen_loss)
+    TransformerDiscriminator.optimizer.apply_gradients(zip(disc_gradients, discriminator.trainable_variables))
+    generator.optimizer.apply_gradients(zip(gen_gradients, generator.model.trainable_variables))
 
-    predictions = tf.round(tf.nn.sigmoid(logits))
-
-    disc_accuracy.update_state(true_labels, predictions)
-    gen_accuracy.update_state(1 - true_labels, predictions)
+    disc_train_loss.update_state(disc_loss)
+    gen_train_loss.update_state(gen_loss)
 
 
 def train(epochs):
     for epoch in range(epochs):
         seed = generate_seeds()
-        for (batch, seed) in enumerate(seed):
-            train_step(seed)
+        train_step(seed)
         print('Epoch {} finished'.format(epoch))
 
 
 train(train_steps)
-
-
