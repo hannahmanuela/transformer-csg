@@ -1,3 +1,9 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[ ]:
+
+
 import numpy as np
 import tensorflow as tf
 import random
@@ -47,7 +53,7 @@ def generate_samples(sess, trainable_model, batch_size, generated_num, output_fi
 
     with open(output_file, 'w') as fout:
         for poem in generated_samples:
-            buffer = ' '.join([str(x) for x in poem]) + '\n'
+            buffer = ' '.join([str(x) for x in poem]) + ''
             fout.write(buffer)
 
 
@@ -57,7 +63,7 @@ def target_loss(sess, target_lstm, data_loader):
     nll = []
     data_loader.reset_pointer()
 
-    for it in xrange(data_loader.num_batch):
+    for it in range(data_loader.num_batch):
         batch = data_loader.next_batch()
         g_loss = sess.run(target_lstm.pretrain_loss, {target_lstm.x: batch})
         nll.append(g_loss)
@@ -95,10 +101,10 @@ def main():
     discriminator = Discriminator(sequence_length=20, num_classes=2, vocab_size=vocab_size, embedding_size=dis_embedding_dim,
                                 filter_sizes=dis_filter_sizes, num_filters=dis_num_filters, l2_reg_lambda=dis_l2_reg_lambda)
 
-    config = tf.ConfigProto()
+    config = tf.compat.v1.ConfigProto()
     config.gpu_options.allow_growth = True
-    sess = tf.Session(config=config)
-    sess.run(tf.global_variables_initializer())
+    sess = tf.compat.v1.Session(config=config)
+    sess.run(tf.compat.v1.global_variables_initializer())
 
     # First, use the oracle model to provide the positive examples, which are sampled from the oracle data distribution
     generate_samples(sess, target_lstm, BATCH_SIZE, generated_num, positive_file)
@@ -107,15 +113,15 @@ def main():
     log = open('save/experiment-log.txt', 'w')
     #  pre-train generator
     print('Start pre-training...')
-    log.write('pre-training...\n')
-    for epoch in xrange(PRE_EPOCH_NUM):
+    log.write('pre-training...')
+    for epoch in range(PRE_EPOCH_NUM):
         loss = pre_train_epoch(sess, generator, gen_data_loader)
         if epoch % 5 == 0:
             generate_samples(sess, generator, BATCH_SIZE, generated_num, eval_file)
             likelihood_data_loader.create_batches(eval_file)
             test_loss = target_loss(sess, target_lstm, likelihood_data_loader)
             print('pre-train epoch ', epoch, 'test_loss ', test_loss)
-            buffer = 'epoch:\t'+ str(epoch) + '\tnll:\t' + str(test_loss) + '\n'
+            buffer = 'epoch:	'+ str(epoch) + '	nll:	' + str(test_loss) + ''
             log.write(buffer)
 
     print('Start pre-training discriminator...')
@@ -125,7 +131,7 @@ def main():
         dis_data_loader.load_train_data(positive_file, negative_file)
         for _ in range(3):
             dis_data_loader.reset_pointer()
-            for it in xrange(dis_data_loader.num_batch):
+            for it in range(dis_data_loader.num_batch):
                 x_batch, y_batch = dis_data_loader.next_batch()
                 feed = {
                     discriminator.input_x: x_batch,
@@ -138,7 +144,7 @@ def main():
 
     print('#########################################################################')
     print('Start Adversarial Training...')
-    log.write('adversarial training...\n')
+    log.write('adversarial training...')
     for total_batch in range(TOTAL_BATCH):
         # Train the generator for one step
         for it in range(1):
@@ -152,7 +158,7 @@ def main():
             generate_samples(sess, generator, BATCH_SIZE, generated_num, eval_file)
             likelihood_data_loader.create_batches(eval_file)
             test_loss = target_loss(sess, target_lstm, likelihood_data_loader)
-            buffer = 'epoch:\t' + str(total_batch) + '\tnll:\t' + str(test_loss) + '\n'
+            buffer = 'epoch:	' + str(total_batch) + '	nll:	' + str(test_loss) + ''
             print('total_batch: ', total_batch, 'test_loss: ', test_loss)
             log.write(buffer)
 
@@ -166,7 +172,7 @@ def main():
 
             for _ in range(3):
                 dis_data_loader.reset_pointer()
-                for it in xrange(dis_data_loader.num_batch):
+                for it in range(dis_data_loader.num_batch):
                     x_batch, y_batch = dis_data_loader.next_batch()
                     feed = {
                         discriminator.input_x: x_batch,
@@ -180,3 +186,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
