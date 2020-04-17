@@ -2,11 +2,11 @@ import numpy as np
 import tensorflow as tf
 import random
 from dataloader import Gen_Data_loader, Dis_dataloader
-from generator import Generator
+from seq_generator import Generator
 from discriminator import Discriminator
 from rollout import ROLLOUT
 from target_lstm import TARGET_LSTM
-import cPickle
+import pickle
 
 #########################################################################################
 #  Generator  Hyper-parameters
@@ -89,7 +89,7 @@ def main():
     dis_data_loader = Dis_dataloader(BATCH_SIZE)
 
     generator = Generator(vocab_size, BATCH_SIZE, EMB_DIM, HIDDEN_DIM, SEQ_LENGTH, START_TOKEN)
-    target_params = cPickle.load(open('save/target_params.pkl'))
+    target_params = pickle.load(open('save/target_params.pkl'))
     target_lstm = TARGET_LSTM(vocab_size, BATCH_SIZE, EMB_DIM, HIDDEN_DIM, SEQ_LENGTH, START_TOKEN, target_params) # The oracle model
 
     discriminator = Discriminator(sequence_length=20, num_classes=2, vocab_size=vocab_size, embedding_size=dis_embedding_dim,
