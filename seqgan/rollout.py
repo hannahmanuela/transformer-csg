@@ -5,7 +5,6 @@
 
 
 import tensorflow as tf
-from tensorflow.python.ops import tensor_array_ops, control_flow_ops
 import numpy as np
 
 
@@ -35,18 +34,18 @@ class ROLLOUT(object):
         with tf.device("/cpu:0"):
             self.processed_x = tf.transpose(a=tf.nn.embedding_lookup(params=self.g_embeddings, ids=self.x), perm=[1, 0, 2])  # seq_length x batch_size x emb_dim
 
-        ta_emb_x = tensor_array_ops.TensorArray(
+        ta_emb_x = tf.TensorArray(
             dtype=tf.float32, size=self.sequence_length)
         ta_emb_x = ta_emb_x.unstack(self.processed_x)
 
-        ta_x = tensor_array_ops.TensorArray(dtype=tf.int32, size=self.sequence_length)
+        ta_x = tf.TensorArray(dtype=tf.int32, size=self.sequence_length)
         ta_x = ta_x.unstack(tf.transpose(a=self.x, perm=[1, 0]))
         #####################################################################################################
 
         self.h0 = tf.zeros([self.batch_size, self.hidden_dim])
         self.h0 = tf.stack([self.h0, self.h0])
 
-        gen_x = tensor_array_ops.TensorArray(dtype=tf.int32, size=self.sequence_length,
+        gen_x = tf.TensorArray(dtype=tf.int32, size=self.sequence_length,
                                              dynamic_size=False, infer_shape=True)
 
         # When current index i < given_num, use the provided tokens as the input at each time step
@@ -66,13 +65,13 @@ class ROLLOUT(object):
             gen_x = gen_x.write(i, next_token)  # indices, batch_size
             return i + 1, x_tp1, h_t, given_num, gen_x
 
-        i, x_t, h_tm1, given_num, self.gen_x = control_flow_ops.while_loop(
+        i, x_t, h_tm1, given_num, self.gen_x = tf.while_loop(
             cond=lambda i, _1, _2, given_num, _4: i < given_num,
             body=_g_recurrence_1,
             loop_vars=(tf.constant(0, dtype=tf.int32),
                        tf.nn.embedding_lookup(params=self.g_embeddings, ids=self.start_token), self.h0, self.given_num, gen_x))
 
-        _, _, _, _, self.gen_x = control_flow_ops.while_loop(
+        _, _, _, _, self.gen_x = tf.while_loop(
             cond=lambda i, _1, _2, _3, _4: i < self.sequence_length,
             body=_g_recurrence_2,
             loop_vars=(i, x_t, h_tm1, given_num, self.gen_x))

@@ -1,27 +1,21 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[ ]:
-
-
 import numpy as np
 import tensorflow as tf
 import random
-from dataloader import Gen_Data_loader, Dis_dataloader
-from seq_generator import Generator
-from discriminator import Discriminator
-from rollout import ROLLOUT
-from target_lstm import TARGET_LSTM
+from seqgan.dataloader import Gen_Data_loader, Dis_dataloader
+from seqgan.generator import Generator
+from seqgan.discriminator import Discriminator
+from seqgan.rollout import ROLLOUT
+from seqgan.target_lstm import TARGET_LSTM
 import pickle
 
 #########################################################################################
 #  Generator  Hyper-parameters
 ######################################################################################
-EMB_DIM = 32 # embedding dimension
-HIDDEN_DIM = 32 # hidden state dimension of lstm cell
-SEQ_LENGTH = 20 # sequence length
+EMB_DIM = 32  # embedding dimension
+HIDDEN_DIM = 32  # hidden state dimension of lstm cell
+SEQ_LENGTH = 20  # sequence length
 START_TOKEN = 0
-PRE_EPOCH_NUM = 120 # supervise (maximum likelihood estimation) epochs
+PRE_EPOCH_NUM = 120  # supervise (maximum likelihood estimation) epochs
 SEED = 88
 BATCH_SIZE = 64
 
@@ -53,7 +47,7 @@ def generate_samples(sess, trainable_model, batch_size, generated_num, output_fi
 
     with open(output_file, 'w') as fout:
         for poem in generated_samples:
-            buffer = ' '.join([str(x) for x in poem]) + ''
+            buffer = ' '.join([str(x) for x in poem]) + '\n'
             fout.write(buffer)
 
 
@@ -76,7 +70,7 @@ def pre_train_epoch(sess, trainable_model, data_loader):
     supervised_g_losses = []
     data_loader.reset_pointer()
 
-    for it in xrange(data_loader.num_batch):
+    for it in range(data_loader.num_batch):
         batch = data_loader.next_batch()
         _, g_loss = trainable_model.pretrain_step(sess, batch)
         supervised_g_losses.append(g_loss)
@@ -90,21 +84,22 @@ def main():
     assert START_TOKEN == 0
 
     gen_data_loader = Gen_Data_loader(BATCH_SIZE)
-    likelihood_data_loader = Gen_Data_loader(BATCH_SIZE) # For testing
+    likelihood_data_loader = Gen_Data_loader(BATCH_SIZE)  # For testing
     vocab_size = 5000
     dis_data_loader = Dis_dataloader(BATCH_SIZE)
 
     generator = Generator(vocab_size, BATCH_SIZE, EMB_DIM, HIDDEN_DIM, SEQ_LENGTH, START_TOKEN)
-    target_params = pickle.load(open('save/target_params.pkl'))
-    target_lstm = TARGET_LSTM(vocab_size, BATCH_SIZE, EMB_DIM, HIDDEN_DIM, SEQ_LENGTH, START_TOKEN, target_params) # The oracle model
+    with open('save/target_params_py3.pkl', 'rb') as f:
+        target_params = pickle.load(f)
+    target_lstm = TARGET_LSTM(vocab_size, BATCH_SIZE, EMB_DIM, HIDDEN_DIM, SEQ_LENGTH, START_TOKEN, target_params)  # The oracle model
 
     discriminator = Discriminator(sequence_length=20, num_classes=2, vocab_size=vocab_size, embedding_size=dis_embedding_dim,
                                 filter_sizes=dis_filter_sizes, num_filters=dis_num_filters, l2_reg_lambda=dis_l2_reg_lambda)
 
-    config = tf.compat.v1.ConfigProto()
+    config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
-    sess = tf.compat.v1.Session(config=config)
-    sess.run(tf.compat.v1.global_variables_initializer())
+    sess = tf.Session(config=config)
+    sess.run(tf.global_variables_initializer())
 
     # First, use the oracle model to provide the positive examples, which are sampled from the oracle data distribution
     generate_samples(sess, target_lstm, BATCH_SIZE, generated_num, positive_file)
@@ -113,7 +108,7 @@ def main():
     log = open('save/experiment-log.txt', 'w')
     #  pre-train generator
     print('Start pre-training...')
-    log.write('pre-training...')
+    log.write('pre-training...\n')
     for epoch in range(PRE_EPOCH_NUM):
         loss = pre_train_epoch(sess, generator, gen_data_loader)
         if epoch % 5 == 0:
@@ -121,7 +116,7 @@ def main():
             likelihood_data_loader.create_batches(eval_file)
             test_loss = target_loss(sess, target_lstm, likelihood_data_loader)
             print('pre-train epoch ', epoch, 'test_loss ', test_loss)
-            buffer = 'epoch:	'+ str(epoch) + '	nll:	' + str(test_loss) + ''
+            buffer = 'epoch:\t'+ str(epoch) + '\tnll:\t' + str(test_loss) + '\n'
             log.write(buffer)
 
     print('Start pre-training discriminator...')
@@ -144,7 +139,7 @@ def main():
 
     print('#########################################################################')
     print('Start Adversarial Training...')
-    log.write('adversarial training...')
+    log.write('adversarial training...\n')
     for total_batch in range(TOTAL_BATCH):
         # Train the generator for one step
         for it in range(1):
@@ -158,7 +153,7 @@ def main():
             generate_samples(sess, generator, BATCH_SIZE, generated_num, eval_file)
             likelihood_data_loader.create_batches(eval_file)
             test_loss = target_loss(sess, target_lstm, likelihood_data_loader)
-            buffer = 'epoch:	' + str(total_batch) + '	nll:	' + str(test_loss) + ''
+            buffer = 'epoch:\t' + str(total_batch) + '\tnll:\t' + str(test_loss) + '\n'
             print('total_batch: ', total_batch, 'test_loss: ', test_loss)
             log.write(buffer)
 
@@ -186,4 +181,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 

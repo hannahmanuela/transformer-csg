@@ -5,7 +5,6 @@
 
 
 import tensorflow as tf
-from tensorflow.python.ops import tensor_array_ops, control_flow_ops
 
 
 class Generator(object):
@@ -45,9 +44,9 @@ class Generator(object):
         self.h0 = tf.zeros([self.batch_size, self.hidden_dim])
         self.h0 = tf.stack([self.h0, self.h0])
 
-        gen_o = tensor_array_ops.TensorArray(dtype=tf.float32, size=self.sequence_length,
+        gen_o = tf.TensorArray(dtype=tf.float32, size=self.sequence_length,
                                              dynamic_size=False, infer_shape=True)
-        gen_x = tensor_array_ops.TensorArray(dtype=tf.int32, size=self.sequence_length,
+        gen_x = tf.TensorArray(dtype=tf.int32, size=self.sequence_length,
                                              dynamic_size=False, infer_shape=True)
 
         def _g_recurrence(i, x_t, h_tm1, gen_o, gen_x):
@@ -61,7 +60,7 @@ class Generator(object):
             gen_x = gen_x.write(i, next_token)  # indices, batch_size
             return i + 1, x_tp1, h_t, gen_o, gen_x
 
-        _, _, _, self.gen_o, self.gen_x = control_flow_ops.while_loop(
+        _, _, _, self.gen_o, self.gen_x = tf.while_loop(
             cond=lambda i, _1, _2, _3, _4: i < self.sequence_length,
             body=_g_recurrence,
             loop_vars=(tf.constant(0, dtype=tf.int32),
@@ -71,11 +70,11 @@ class Generator(object):
         self.gen_x = tf.transpose(a=self.gen_x, perm=[1, 0])  # batch_size x seq_length
 
         # supervised pretraining for generator
-        g_predictions = tensor_array_ops.TensorArray(
+        g_predictions = tf.TensorArray(
             dtype=tf.float32, size=self.sequence_length,
             dynamic_size=False, infer_shape=True)
 
-        ta_emb_x = tensor_array_ops.TensorArray(
+        ta_emb_x = tf.TensorArray(
             dtype=tf.float32, size=self.sequence_length)
         ta_emb_x = ta_emb_x.unstack(self.processed_x)
 
@@ -86,7 +85,7 @@ class Generator(object):
             x_tp1 = ta_emb_x.read(i)
             return i + 1, x_tp1, h_t, g_predictions
 
-        _, _, _, self.g_predictions = control_flow_ops.while_loop(
+        _, _, _, self.g_predictions = tf.while_loop(
             cond=lambda i, _1, _2, _3: i < self.sequence_length,
             body=_pretrain_recurrence,
             loop_vars=(tf.constant(0, dtype=tf.int32),
